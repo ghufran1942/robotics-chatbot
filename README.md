@@ -128,30 +128,6 @@ robotics_chatbot/
 └── README.md              # This file
 ```
 
-### Core Components
-
-1. **Document Loaders** (`backend/loaders.py`):
-   - arXiv paper retrieval
-   - ROS documentation scraping
-   - Stack Exchange Q&A extraction
-   - Web search integration
-
-2. **Vector Store** (`backend/vectorstore.py`):
-   - FAISS index management
-   - Document embedding and storage
-   - Semantic search functionality
-
-3. **Summarizer** (`backend/summarizer.py`):
-   - Google Gemini integration
-   - Structured answer generation
-   - Source citation and grounding
-
-4. **Web Interface** (`frontend/app.py`):
-   - Modern Streamlit UI
-   - Real-time chat interface
-   - Topic management
-   - Source visualization
-
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -162,28 +138,6 @@ robotics_chatbot/
 - `MAX_DOCUMENTS_PER_TOPIC`: Maximum documents per topic (default: 50)
 - `CHUNK_SIZE`: Document chunk size for processing (default: 1000)
 - `CHUNK_OVERLAP`: Overlap between chunks (default: 200)
-
-### API Endpoints
-
-- `GET /`: API status
-- `GET /topics`: List available topics
-- `POST /load_topic`: Load documents for a topic
-- `POST /ask`: Ask a question about a topic
-- `GET /topic_summary/{topic}`: Get topic summary
-- `POST /auto_generate_topics`: Auto-generate common topics
-- `DELETE /topic/{topic}`: Delete a topic
-
-## 🎯 Example Use Cases
-
-### Educational Use
-- **Students**: Learn robotics concepts through interactive Q&A
-- **Researchers**: Quick access to relevant papers and documentation
-- **Engineers**: Reference implementation details and best practices
-
-### Research Use
-- **Literature Review**: Automated paper discovery and summarization
-- **Technical Documentation**: Quick access to ROS and robotics documentation
-- **Problem Solving**: Get answers to specific technical questions
 
 ## 🔍 Advanced Features
 
@@ -224,30 +178,6 @@ You can add custom topics by:
    - Use smaller chunk sizes for faster processing
    - Consider using GPU-accelerated FAISS for large datasets
 
-### Debug Mode
-
-To enable debug logging, set the environment variable:
-```bash
-export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-python -u backend/main.py
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- **LangChain**: For the document processing and LLM integration framework
-- **FAISS**: For efficient vector similarity search
-- **Google Gemini**: For the AI language model
-- **Streamlit**: For the beautiful web interface
-- **ROS Community**: For the robotics documentation and resources
