@@ -1,0 +1,16 @@
+langchain
+# langchain-google-genai
+langchain-community
+# faiss-cpu==1.7.4
+streamlit
+beautifulsoup4
+requests
+python-dotenv
+# arxiv==2.1.0
+pypdf
+# sentence-transformers
+numpy
+pandas
+# fastapi==0.104.1
+uvicorn
+pydantic
