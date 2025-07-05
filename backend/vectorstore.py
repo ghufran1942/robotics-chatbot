@@ -27,11 +27,15 @@ class RoboticsVectorStore:
         
         # Extract text content for embedding
         texts = []
+        valid_docs = []
+        
         for doc in documents:
             if "content" in doc:
                 texts.append(doc["content"])
+                valid_docs.append(doc)
             elif "summary" in doc:
                 texts.append(doc["summary"])
+                valid_docs.append(doc)
             else:
                 # Skip documents without content
                 continue
@@ -51,19 +55,90 @@ class RoboticsVectorStore:
         self.index.add(embeddings.astype('float32'))
         
         # Store documents and metadata
-        for doc in documents:
-            if "content" in doc or "summary" in doc:
-                self.documents.append(doc)
-                self.metadata.append({
-                    "title": doc.get("title", "Unknown"),
-                    "source": doc.get("source", "unknown"),
-                    "url": doc.get("url", ""),
-                    "authors": doc.get("authors", []),
-                    "published": doc.get("published", ""),
-                    "arxiv_id": doc.get("arxiv_id", "")
-                })
+        for doc in valid_docs:
+            self.documents.append(doc)
+            self.metadata.append({
+                "title": doc.get("title", "Unknown"),
+                "source": doc.get("source", "unknown"),
+                "url": doc.get("url", ""),
+                "authors": doc.get("authors", []),
+                "published": doc.get("published", ""),
+                "arxiv_id": doc.get("arxiv_id", ""),
+                "categories": doc.get("categories", []),
+                "doi": doc.get("doi", ""),
+                "file_path": doc.get("file_path", ""),
+                "chunk_id": doc.get("chunk_id", 0),
+                "total_chunks": doc.get("total_chunks", 1)
+            })
         
         print(f"Added {len(texts)} documents to vector store. Total documents: {len(self.documents)}")
+    
+    def get_documents_by_source(self, source: str) -> List[Dict]:
+        """Get documents filtered by source."""
+        filtered_docs = []
+        for i, metadata in enumerate(self.metadata):
+            if metadata.get("source") == source:
+                if i < len(self.documents):
+                    filtered_docs.append(self.documents[i])
+        return filtered_docs
+    
+    def get_source_stats(self) -> Dict:
+        """Get statistics about documents by source."""
+        source_counts = {}
+        for metadata in self.metadata:
+            source = metadata.get("source", "unknown")
+            source_counts[source] = source_counts.get(source, 0) + 1
+        
+        return source_counts
+    
+    def remove_documents_by_source(self, source: str) -> int:
+        """Remove all documents from a specific source."""
+        if self.index is None:
+            return 0
+        
+        # Find indices to remove
+        indices_to_remove = []
+        for i, metadata in enumerate(self.metadata):
+            if metadata.get("source") == source:
+                indices_to_remove.append(i)
+        
+        if not indices_to_remove:
+            return 0
+        
+        # Create new index without removed documents
+        remaining_texts = []
+        remaining_docs = []
+        remaining_metadata = []
+        
+        for i in range(len(self.documents)):
+            if i not in indices_to_remove:
+                doc = self.documents[i]
+                if "content" in doc:
+                    remaining_texts.append(doc["content"])
+                elif "summary" in doc:
+                    remaining_texts.append(doc["summary"])
+                else:
+                    continue
+                
+                remaining_docs.append(doc)
+                remaining_metadata.append(self.metadata[i])
+        
+        # Rebuild index
+        if remaining_texts:
+            embeddings = self.encoder.encode(remaining_texts, show_progress_bar=True)
+            dimension = embeddings.shape[1]
+            self.index = faiss.IndexFlatIP(dimension)
+            self.index.add(embeddings.astype('float32'))
+        else:
+            self.index = None
+        
+        # Update document lists
+        self.documents = remaining_docs
+        self.metadata = remaining_metadata
+        
+        removed_count = len(indices_to_remove)
+        print(f"Removed {removed_count} documents from source '{source}'")
+        return removed_count
     
     def search(self, query: str, k: int = 5) -> List[Dict]:
         """Search for similar documents using the query."""

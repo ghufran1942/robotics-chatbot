@@ -1,7 +1,7 @@
 import requests
 import arxiv
 from bs4 import BeautifulSoup
-from langchain.document_loaders import WebBaseLoader, ArxivLoader
+from langchain_community.document_loaders import WebBaseLoader, ArxivLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from typing import List, Dict, Optional
 import re

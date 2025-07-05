@@ -1,2 +1,5 @@
 .env
 example_usage.py
+vectorstore/
+__pycache__/
+backend/__pycache__/

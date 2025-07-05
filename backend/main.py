@@ -1,7 +1,7 @@
 import os
 import sys
 from typing import Dict, List, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile
 from pydantic import BaseModel
 import uvicorn
 
@@ -11,7 +11,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.loaders import RoboticsDocumentLoader
 from backend.vectorstore import RoboticsVectorStore
 from backend.summarizer import RoboticsSummarizer
-from config import COMMON_ROBOTICS_TOPICS
+from backend.pdf_uploader import PDFUploader
+from backend.arxiv_search import ArxivSearcher
+from config import COMMON_ROBOTICS_TOPICS, FAISS_INDEX_PATH
 
 # Initialize FastAPI app
 app = FastAPI(title="Robotics Chatbot API", version="1.0.0")
@@ -39,6 +41,8 @@ class TopicResponse(BaseModel):
 document_loader = RoboticsDocumentLoader()
 vector_store = RoboticsVectorStore()
 summarizer = RoboticsSummarizer()
+pdf_uploader = PDFUploader()
+arxiv_searcher = ArxivSearcher()
 
 @app.on_event("startup")
 async def startup_event():
@@ -243,7 +247,7 @@ async def delete_topic(topic: str):
     try:
         import shutil
         
-        topic_dir = os.path.join(vector_store.FAISS_INDEX_PATH, topic.replace(" ", "_").lower())
+        topic_dir = os.path.join(FAISS_INDEX_PATH, topic.replace(" ", "_").lower())
         
         if os.path.exists(topic_dir):
             shutil.rmtree(topic_dir)
@@ -256,6 +260,152 @@ async def delete_topic(topic: str):
             
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# PDF Upload endpoints
+@app.post("/upload_pdf")
+async def upload_pdf(file: UploadFile):
+    """Upload and process a PDF file."""
+    try:
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(
+                status_code=400,
+                detail="Only PDF files are supported"
+            )
+        
+        # Process the PDF
+        result = pdf_uploader.process_pdf(file, file.filename)
+        
+        if result["success"]:
+            # Add documents to vector store
+            vector_store.add_documents(result["documents"])
+            
+            return {
+                "message": f"PDF '{file.filename}' processed successfully",
+                "filename": file.filename,
+                "chunk_count": result["chunk_count"],
+                "text_length": result["text_length"]
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to process PDF: {result['error']}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/uploaded_files")
+async def get_uploaded_files():
+    """Get list of uploaded PDF files."""
+    try:
+        files = pdf_uploader.get_uploaded_files()
+        stats = pdf_uploader.get_upload_stats()
+        
+        return {
+            "files": files,
+            "stats": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/uploaded_file/{filename}")
+async def delete_uploaded_file(filename: str):
+    """Delete an uploaded PDF file."""
+    try:
+        # Remove from vector store first
+        removed_count = vector_store.remove_documents_by_source("uploaded_pdf")
+        
+        # Delete the file
+        success = pdf_uploader.delete_uploaded_file(filename)
+        
+        if success:
+            return {
+                "message": f"File '{filename}' deleted successfully",
+                "removed_documents": removed_count
+            }
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail=f"File '{filename}' not found"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ArXiv Search endpoints
+@app.post("/search_arxiv")
+async def search_arxiv(request: dict):
+    """Search arXiv for papers related to a topic."""
+    try:
+        query = request.get("query", "").strip()
+        max_results = request.get("max_results", 5)
+        
+        if not query:
+            raise HTTPException(
+                status_code=400,
+                detail="Query is required"
+            )
+        
+        if not arxiv_searcher.validate_query(query):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid query"
+            )
+        
+        # Search and process papers
+        result = arxiv_searcher.search_and_process(query, max_results)
+        
+        if result["success"]:
+            # Add documents to vector store
+            vector_store.add_documents(result["documents"])
+            
+            return {
+                "message": f"Found {result['paper_count']} papers for '{query}'",
+                "papers": result["papers"],
+                "paper_count": result["paper_count"],
+                "document_count": result["document_count"],
+                "query": query
+            }
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No papers found: {result['error']}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/arxiv_stats")
+async def get_arxiv_stats():
+    """Get statistics about arXiv papers in the vector store."""
+    try:
+        arxiv_docs = vector_store.get_documents_by_source("arxiv")
+        source_stats = vector_store.get_source_stats()
+        
+        return {
+            "arxiv_document_count": len(arxiv_docs),
+            "source_stats": source_stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/arxiv_papers")
+async def clear_arxiv_papers():
+    """Remove all arXiv papers from the vector store."""
+    try:
+        removed_count = vector_store.remove_documents_by_source("arxiv")
+        
+        return {
+            "message": f"Removed {removed_count} arXiv papers",
+            "removed_count": removed_count
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

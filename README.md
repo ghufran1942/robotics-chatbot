@@ -6,15 +6,17 @@ An intelligent, interactive chatbot designed to help learners understand robotic
 
 - **Natural Language Questions**: Ask questions about robotics concepts in plain English
 - **Multi-Source Document Retrieval**: Automatically fetches relevant documents from:
-  - arXiv papers
-  - ROS documentation
-  - Robotics Stack Exchange
-  - General web sources
+  - **ArXiv Papers**: Dynamic search for recent research papers
+  - **User-Uploaded PDFs**: Upload textbooks, research papers, or notes
+  - **Robotics Stack Exchange**: Community Q&A and discussions
+  - **General web sources**: Educational content and tutorials
 - **AI-Powered Summarization**: Uses Google Gemini to generate comprehensive, structured answers
 - **Vector Search**: FAISS-based semantic search for relevant document retrieval
 - **Modern Web Interface**: Beautiful Streamlit frontend with real-time chat
 - **Topic Management**: Load, save, and manage different robotics topics
 - **Source Grounding**: All answers are grounded in retrieved documents with citations
+- **PDF Processing**: Support for multiple PDF libraries (PyPDF2, pdfplumber, LangChain)
+- **Dynamic ArXiv Integration**: Real-time paper search and processing
 
 ## 📋 Prerequisites
 
@@ -103,14 +105,28 @@ Examples of questions you can ask:
 - "What are the mathematical foundations of path planning?"
 - "Explain sensor fusion techniques for robot localization"
 
-### 4. Understanding Answers
+### 4. Using New Features
+
+**📄 PDF Upload:**
+- Upload your own PDF documents (textbooks, papers, notes)
+- Documents are automatically processed and indexed
+- Content is included in future question answers
+- View and manage uploaded files in the sidebar
+
+**🔬 ArXiv Integration:**
+- Toggle "Use ArXiv Papers" to include recent research
+- Search for specific topics: "PID control robotics"
+- Papers are automatically processed and added to the knowledge base
+- Citations are included in answers
+
+### 5. Understanding Answers
 
 Each answer is structured with:
 - **Introduction**: Clear explanation of the concept
 - **Applications in Robotics**: Real-world use cases
 - **Mathematical Explanation**: Formulas and theoretical foundations
 - **Tuning Methods**: Practical implementation considerations
-- **Sources**: References to the documents used
+- **Sources**: References to the documents used (including uploaded PDFs and ArXiv papers)
 
 ## 🏗️ Architecture
 
@@ -120,7 +136,9 @@ robotics_chatbot/
 │   ├── main.py              # FastAPI backend server
 │   ├── loaders.py           # Document loading from various sources
 │   ├── vectorstore.py       # FAISS vector store management
-│   └── summarizer.py        # LangChain + Gemini summarization
+│   ├── summarizer.py        # LangChain + Gemini summarization
+│   ├── pdf_uploader.py      # PDF processing and upload management
+│   └── arxiv_search.py      # ArXiv paper search and processing
 ├── frontend/
 │   └── app.py              # Streamlit web interface
 ├── config.py               # Configuration and constants

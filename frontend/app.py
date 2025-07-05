@@ -137,6 +137,12 @@ def main():
     # Initialize session state
     init_session_state()
     
+    # Add new session state variables for new features
+    if "use_arxiv" not in st.session_state:
+        st.session_state.use_arxiv = True
+    if "uploaded_files" not in st.session_state:
+        st.session_state.uploaded_files = []
+    
     # Custom CSS for better styling
     st.markdown("""
     <style>
@@ -157,10 +163,12 @@ def main():
     .user-message {
         background-color: #e3f2fd;
         border-left: 4px solid #2196f3;
+        color: black;
     }
     .bot-message {
         background-color: #f3e5f5;
         border-left: 4px solid #9c27b0;
+        color: black;
     }
     .stButton > button {
         width: 100%;
@@ -202,6 +210,70 @@ def main():
             result = auto_generate_topics()
             if result:
                 st.rerun()
+        
+        # PDF Upload Section
+        st.subheader("📄 PDF Upload")
+        uploaded_file = st.file_uploader(
+            "Upload a PDF document",
+            type=['pdf'],
+            help="Upload textbooks, research papers, or notes to include in answers"
+        )
+        
+        if uploaded_file is not None:
+            if st.button("📤 Process PDF"):
+                with st.spinner("Processing PDF..."):
+                    try:
+                        # Upload file to backend
+                        files = {"file": uploaded_file}
+                        response = requests.post(f"{API_BASE_URL}/upload_pdf", files=files)
+                        
+                        if response.status_code == 200:
+                            result = response.json()
+                            st.success(f"✅ {result['message']}")
+                            st.info(f"📊 {result['chunk_count']} chunks created")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Error: {response.json().get('detail', 'Unknown error')}")
+                    except Exception as e:
+                        st.error(f"❌ Upload failed: {e}")
+        
+        # ArXiv Integration
+        st.subheader("🔬 ArXiv Papers")
+        use_arxiv = st.checkbox(
+            "Use ArXiv Papers 🔎",
+            value=st.session_state.use_arxiv,
+            help="Include recent arXiv papers in search results"
+        )
+        st.session_state.use_arxiv = use_arxiv
+        
+        if use_arxiv:
+            arxiv_query = st.text_input(
+                "Search arXiv for papers:",
+                placeholder="e.g., 'PID control robotics'",
+                help="Search for recent papers on this topic"
+            )
+            
+            if st.button("🔍 Search ArXiv"):
+                if arxiv_query:
+                    with st.spinner("Searching arXiv..."):
+                        try:
+                            response = requests.post(f"{API_BASE_URL}/search_arxiv", 
+                                                  json={"query": arxiv_query, "max_results": 5})
+                            
+                            if response.status_code == 200:
+                                result = response.json()
+                                st.success(f"✅ Found {result['paper_count']} papers")
+                                
+                                # Show paper titles
+                                for i, paper in enumerate(result['papers'], 1):
+                                    st.write(f"{i}. **{paper['title']}**")
+                                    st.write(f"   Authors: {', '.join(paper['authors'][:3])}")
+                                    st.write(f"   Published: {paper['published']}")
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Error: {response.json().get('detail', 'Unknown error')}")
+                        except Exception as e:
+                            st.error(f"❌ Search failed: {e}")
         
         # Current topic display
         if st.session_state.current_topic:
@@ -296,6 +368,67 @@ def main():
                     st.error(f"Error getting summary: {e}")
         else:
             st.info("No topic selected")
+        
+        # Document Sources
+        st.subheader("📚 Document Sources")
+        
+        # Get source statistics
+        try:
+            response = call_api("/arxiv_stats")
+            if response:
+                source_stats = response.get("source_stats", {})
+                
+                # Display statistics
+                col_stats1, col_stats2 = st.columns(2)
+                with col_stats1:
+                    st.metric("ArXiv Papers", source_stats.get("arxiv", 0))
+                    st.metric("Uploaded PDFs", source_stats.get("uploaded_pdf", 0))
+                with col_stats2:
+                    st.metric("Web Sources", source_stats.get("web_search", 0))
+                    st.metric("Stack Exchange", source_stats.get("stack_exchange", 0))
+                
+                # Show uploaded files
+                uploaded_response = call_api("/uploaded_files")
+                if uploaded_response and uploaded_response.get("files"):
+                    st.write("**📄 Uploaded Files:**")
+                    for file_info in uploaded_response["files"]:
+                        with st.expander(f"📄 {file_info['filename']}"):
+                            st.write(f"**Size:** {file_info['size']} bytes")
+                            st.write(f"**Uploaded:** {file_info['uploaded']}")
+                            if st.button(f"🗑️ Delete {file_info['filename']}", key=f"del_{file_info['filename']}"):
+                                try:
+                                    delete_response = requests.delete(f"{API_BASE_URL}/uploaded_file/{file_info['filename']}")
+                                    if delete_response.status_code == 200:
+                                        st.success("File deleted!")
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to delete file")
+                                except Exception as e:
+                                    st.error(f"Error: {e}")
+        except Exception as e:
+            st.info("No document sources available")
+        
+        # Management buttons
+        st.subheader("⚙️ Management")
+        
+        col_mgmt1, col_mgmt2 = st.columns(2)
+        
+        with col_mgmt1:
+            if st.button("🗑️ Clear ArXiv Papers"):
+                try:
+                    response = requests.delete(f"{API_BASE_URL}/arxiv_papers")
+                    if response.status_code == 200:
+                        result = response.json()
+                        st.success(f"✅ {result['message']}")
+                        st.rerun()
+                    else:
+                        st.error("Failed to clear papers")
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        
+        with col_mgmt2:
+            if st.button("🔄 Refresh Sources"):
+                st.rerun()
         
         # Quick actions
         st.subheader("⚡ Quick Actions")

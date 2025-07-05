@@ -15,7 +15,7 @@ class RoboticsSummarizer:
             raise ValueError("GOOGLE_API_KEY is required. Please set it in your environment variables.")
         
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-pro",
+            model="gemini-2.0-flash",
             google_api_key=GOOGLE_API_KEY,
             temperature=0.3,
             max_output_tokens=2048

@@ -1,16 +1,37 @@
+# Core dependencies for Robotics Chatbot
+# Install with: pip install -r requirements.txt
+
+# LangChain and AI
 langchain
-# langchain-google-genai
+langchain-google-genai
 langchain-community
-# faiss-cpu==1.7.4
+langchain-core
+langchain-text-splitters
+
+# Vector store and embeddings
+faiss-cpu
+sentence-transformers
+
+# Web framework
 streamlit
-beautifulsoup4
+fastapi
+uvicorn
+
+# PDF processing
+PyPDF2
+pdfplumber
+
+# Web scraping and requests
 requests
-python-dotenv
-# arxiv==2.1.0
-pypdf
-# sentence-transformers
+beautifulsoup4
+
+# ArXiv integration
+arxiv
+
+# Data processing
 numpy
 pandas
-# fastapi==0.104.1
-uvicorn
+
+# Utilities
+python-dotenv
 pydantic
