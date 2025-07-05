@@ -23,19 +23,19 @@ ROBOTICS_SOURCES = {
 }
 
 # Common robotics topics for auto-generation
-COMMON_ROBOTICS_TOPICS = [
-    "PID controller",
-    "SLAM",
-    "robotic grippers", 
-    "localization",
-    "path planning",
-    "computer vision",
-    "sensor fusion",
-    "kinematics",
-    "dynamics",
-    "control systems",
-    "machine learning in robotics",
-    "autonomous navigation",
-    "manipulation",
-    "human-robot interaction"
-] 
+# COMMON_ROBOTICS_TOPICS = [
+#     "PID controller",
+#     "SLAM",
+#     "robotic grippers", 
+#     "localization",
+#     "path planning",
+#     "computer vision",
+#     "sensor fusion",
+#     "kinematics",
+#     "dynamics",
+#     "control systems",
+#     "machine learning in robotics",
+#     "autonomous navigation",
+#     "manipulation",
+#     "human-robot interaction"
+# ] 

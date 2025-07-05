@@ -3,3 +3,16 @@ example_usage.py
 vectorstore/
 __pycache__/
 backend/__pycache__/
+uploads/
+mcp_cache/
+.vscode/
+test_freshness.py
+test_chat_modes_mock.py
+test_mcp.py
+test_mcp_priority.py
+test_3step_processing.py
+run.py
+setup.py
+demo.py
+demo_smart_prompts.py
+example_usage.py

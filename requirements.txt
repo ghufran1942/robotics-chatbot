@@ -35,3 +35,7 @@ pandas
 # Utilities
 python-dotenv
 pydantic
+
+# MCP and caching
+pathlib
+hashlib

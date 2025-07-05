@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException, UploadFile
 from pydantic import BaseModel
 import uvicorn
 
-# Add the parent directory to the path to import modules
+# Path to import modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.loaders import RoboticsDocumentLoader
@@ -13,12 +13,14 @@ from backend.vectorstore import RoboticsVectorStore
 from backend.summarizer import RoboticsSummarizer
 from backend.pdf_uploader import PDFUploader
 from backend.arxiv_search import ArxivSearcher
+from backend.mcp_store import MCPStore
+from backend.chat_modes import ResearchChatProcessor, TutorialChatProcessor, ExplanationChatProcessor
 from config import COMMON_ROBOTICS_TOPICS, FAISS_INDEX_PATH
 
 # Initialize FastAPI app
 app = FastAPI(title="Robotics Chatbot API", version="1.0.0")
 
-# Pydantic models for API requests/responses
+# Models for API requests/responses
 class QuestionRequest(BaseModel):
     topic: str
     question: str
@@ -43,6 +45,14 @@ vector_store = RoboticsVectorStore()
 summarizer = RoboticsSummarizer()
 pdf_uploader = PDFUploader()
 arxiv_searcher = ArxivSearcher()
+mcp_store = MCPStore()
+
+# Initialize chat mode processors
+chat_processors = {
+    "research": ResearchChatProcessor(summarizer.llm),
+    "tutorial": TutorialChatProcessor(summarizer.llm),
+    "explanation": ExplanationChatProcessor(summarizer.llm)
+}
 
 @app.on_event("startup")
 async def startup_event():
@@ -147,6 +157,94 @@ async def ask_question(request: QuestionRequest):
             num_sources=answer_data["num_sources"],
             topic=topic
         )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/process_question")
+async def process_question_with_workflow(request: dict):
+    """Process a question using the complete workflow: MCP → arXiv → LLM."""
+    try:
+        question = request.get("question", "").strip()
+        explain_concept = request.get("explain_concept", True)
+        include_examples = request.get("include_examples", True)
+        include_code = request.get("include_code", True)
+        
+        if not question:
+            raise HTTPException(
+                status_code=400,
+                detail="Question is required"
+            )
+        
+        # Use the new workflow method
+        result = summarizer.process_question_with_workflow(
+            question, explain_concept, include_examples, include_code
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/refresh_topic")
+async def refresh_topic_endpoint(request: dict):
+    """Refresh a topic by re-fetching from its source."""
+    try:
+        topic = request.get("topic", "").strip()
+        force_refresh = request.get("force_refresh", False)
+        
+        if not topic:
+            raise HTTPException(
+                status_code=400,
+                detail="Topic is required"
+            )
+        
+        # Use MCP store to refresh the topic
+        refresh_result = mcp_store.refresh_topic(topic, force_refresh)
+        
+        return refresh_result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "service": "robotics-chatbot"}
+
+@app.get("/topic_freshness/{topic}")
+async def get_topic_freshness(topic: str):
+    """Get freshness information for a topic."""
+    try:
+        metadata = mcp_store.get_topic_metadata(topic)
+        return metadata
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/process_question_3step")
+async def process_question_3step(request: dict):
+    """Process a question using the 3-step loop: Rewrite → Enhance → Answer."""
+    try:
+        question = request.get("question", "").strip()
+        context = request.get("context", "")
+        
+        if not question:
+            raise HTTPException(
+                status_code=400,
+                detail="Question is required"
+            )
+        
+        # Use the new 3-step processing method
+        result = summarizer.process_question_3step(question, context)
+        
+        return result
         
     except HTTPException:
         raise
@@ -406,6 +504,164 @@ async def clear_arxiv_papers():
             "message": f"Removed {removed_count} arXiv papers",
             "removed_count": removed_count
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# MCP (Memory Cache + Persistent Storage) endpoints
+@app.get("/mcp/stats")
+async def get_mcp_stats():
+    """Get MCP cache statistics."""
+    try:
+        stats = mcp_store.get_cache_stats()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/mcp/fetch_docs")
+async def fetch_documentation(request: dict):
+    """Fetch and cache documentation for a specific topic."""
+    try:
+        topic = request.get("topic", "").strip()
+        source_url = request.get("source_url", "").strip()
+        source_type = request.get("source_type", "web")
+        
+        if not topic or not source_url:
+            raise HTTPException(
+                status_code=400,
+                detail="Both topic and source_url are required"
+            )
+        
+        # Fetch and cache documentation
+        documents = mcp_store.fetch_and_cache_docs(topic, source_url, source_type)
+        
+        return {
+            "topic": topic,
+            "source_url": source_url,
+            "documents_fetched": len(documents),
+            "status": "cached" if documents else "failed"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/mcp/cached_topics")
+async def get_cached_topics():
+    """Get list of cached topics in MCP."""
+    try:
+        cached_topics = []
+        for cache_key, entry in mcp_store.metadata.items():
+            if not mcp_store._is_expired(entry.get("timestamp", "")):
+                cached_topics.append({
+                    "topic": entry.get("topic", ""),
+                    "source_url": entry.get("source_url", ""),
+                    "source_type": entry.get("source_type", ""),
+                    "timestamp": entry.get("timestamp", ""),
+                    "document_count": entry.get("document_count", 0),
+                    "cache_age": mcp_store._get_cache_age(entry.get("timestamp", ""))
+                })
+        
+        return {
+            "cached_topics": cached_topics,
+            "total_cached": len(cached_topics)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/mcp/clear_expired")
+async def clear_expired_mcp_cache():
+    """Clear expired cache entries from MCP."""
+    try:
+        cleared_count = mcp_store.clear_expired_cache()
+        return {
+            "message": f"Cleared {cleared_count} expired cache entries",
+            "remaining_entries": len(mcp_store.metadata)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/mcp/clear_all")
+async def clear_all_mcp_cache():
+    """Clear all MCP cache entries."""
+    try:
+        cleared_count = mcp_store.clear_all_cache()
+        return {
+            "message": f"Cleared {cleared_count} cache entries",
+            "remaining_entries": 0
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Chat Mode endpoints
+@app.post("/chat/research")
+async def research_chat(request: dict):
+    """Research Chat mode - process research questions with paper analysis."""
+    try:
+        question = request.get("question", "").strip()
+        uploaded_papers = request.get("uploaded_papers", [])
+        
+        if not question:
+            raise HTTPException(
+                status_code=400,
+                detail="Question is required"
+            )
+        
+        result = chat_processors["research"].process_research_question(question, uploaded_papers)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/chat/tutorial")
+async def tutorial_chat(request: dict):
+    """Tutorial/How-to Chat mode - generate tutorials with library documentation."""
+    try:
+        request_text = request.get("request", "").strip()
+        library_name = request.get("library_name", "").strip()
+        doc_url = request.get("doc_url", "").strip()
+        output_mode = request.get("output_mode", "Code")
+        
+        if not request_text or not library_name:
+            raise HTTPException(
+                status_code=400,
+                detail="Request and library_name are required"
+            )
+        
+        result = chat_processors["tutorial"].process_tutorial_request(
+            request_text, library_name, doc_url, output_mode
+        )
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/chat/explanation")
+async def explanation_chat(request: dict):
+    """Explanation Chat mode - explain concepts with complexity levels."""
+    try:
+        request_text = request.get("request", "").strip()
+        complexity_level = request.get("complexity_level", "Intermediate")
+        output_mode = request.get("output_mode", "Example")
+        
+        if not request_text:
+            raise HTTPException(
+                status_code=400,
+                detail="Request is required"
+            )
+        
+        result = chat_processors["explanation"].process_explanation_request(
+            request_text, complexity_level, output_mode
+        )
+        return result
+        
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

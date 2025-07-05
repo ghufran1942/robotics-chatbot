@@ -154,7 +154,7 @@ class ArxivSearcher:
         return documents
     
     def search_and_process(self, query: str, max_results: int = 5) -> Dict:
-        """Search arXiv and process papers into documents."""
+        """Search arXiv and process papers into documents with enhanced metadata."""
         try:
             # Search for papers
             papers = self.search_papers(query, max_results)
@@ -164,7 +164,10 @@ class ArxivSearcher:
                     "success": False,
                     "error": "No papers found for the query",
                     "papers": [],
-                    "documents": []
+                    "documents": [],
+                    "source": "arxiv",
+                    "query": query,
+                    "total_found": 0
                 }
             
             # Process papers into documents
@@ -176,7 +179,19 @@ class ArxivSearcher:
                 "documents": documents,
                 "paper_count": len(papers),
                 "document_count": len(documents),
-                "query": query
+                "query": query,
+                "source": "arxiv",
+                "total_found": len(papers),
+                "references": [
+                    {
+                        "title": paper["title"],
+                        "authors": paper["authors"],
+                        "url": paper["pdf_url"],
+                        "arxiv_id": paper["arxiv_id"],
+                        "published": paper["published"]
+                    }
+                    for paper in papers
+                ]
             }
             
         except Exception as e:
@@ -184,7 +199,10 @@ class ArxivSearcher:
                 "success": False,
                 "error": str(e),
                 "papers": [],
-                "documents": []
+                "documents": [],
+                "source": "arxiv",
+                "query": query,
+                "total_found": 0
             }
     
     def get_paper_citations(self, papers: List[Dict]) -> List[str]:
