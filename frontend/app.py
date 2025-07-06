@@ -11,6 +11,7 @@ import requests
 import json
 from typing import Dict, List, Optional
 import time
+import os
 
 # Page configuration
 st.set_page_config(
@@ -71,8 +72,11 @@ if 'processing_state' not in st.session_state:
     st.session_state.processing_state = "idle"
 
 def get_backend_url():
-    """Get backend URL from config or default."""
-    return "http://localhost:8000"
+    """Get backend URL from environment or default."""
+    if os.getenv('BACKEND_ON_RENDER', 'false').lower() == 'true':
+        return os.getenv('BACKEND_URL', 'https://robotics-chatbot-api.onrender.com')
+    else:
+        return os.getenv('BACKEND_URL', 'http://localhost:8000')
 
 def call_backend_api(endpoint: str, data: Dict) -> Dict:
     """Make API call to backend."""
