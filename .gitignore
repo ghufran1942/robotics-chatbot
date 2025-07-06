@@ -16,3 +16,8 @@ setup.py
 demo.py
 demo_smart_prompts.py
 example_usage.py
+.dockerignore*
+backend-env.yaml
+cloudbuild-backend.yaml
+build-and-deploy-backend.sh
+Dockerfile.backend

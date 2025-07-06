@@ -15,7 +15,7 @@ from backend.pdf_uploader import PDFUploader
 from backend.arxiv_search import ArxivSearcher
 from backend.mcp_store import MCPStore
 from backend.chat_modes import ResearchChatProcessor, TutorialChatProcessor, ExplanationChatProcessor
-from config import COMMON_ROBOTICS_TOPICS, FAISS_INDEX_PATH
+from config import FAISS_INDEX_PATH
 
 # Initialize FastAPI app
 app = FastAPI(title="Robotics Chatbot API", version="1.0.0")
@@ -58,7 +58,7 @@ chat_processors = {
 async def startup_event():
     """Initialize the chatbot on startup."""
     print("🚀 Starting Robotics Chatbot...")
-    print(f"Available topics: {COMMON_ROBOTICS_TOPICS}")
+    # print(f"Available topics: {COMMON_ROBOTICS_TOPICS}")
 
 @app.get("/")
 async def root():
@@ -71,7 +71,7 @@ async def get_available_topics():
     existing_topics = vector_store.get_topics()
     return {
         "existing_topics": existing_topics,
-        "suggested_topics": COMMON_ROBOTICS_TOPICS
+        # "suggested_topics": COMMON_ROBOTICS_TOPICS
     }
 
 @app.post("/load_topic", response_model=TopicResponse)
@@ -281,61 +281,6 @@ async def get_topic_summary(topic: str):
             
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/auto_generate_topics")
-async def auto_generate_topics():
-    """Auto-generate document collections for common robotics topics."""
-    try:
-        results = []
-        
-        for topic in COMMON_ROBOTICS_TOPICS:
-            try:
-                # Check if topic already exists
-                if vector_store.index_exists(topic):
-                    results.append({
-                        "topic": topic,
-                        "status": "already_exists",
-                        "document_count": 0
-                    })
-                    continue
-                
-                # Load documents for the topic
-                documents = document_loader.load_all_sources(topic)
-                
-                if documents:
-                    # Split and add to vector store
-                    split_docs = document_loader.split_documents(documents)
-                    vector_store.clear()
-                    vector_store.add_documents(split_docs)
-                    vector_store.save_index(topic)
-                    
-                    results.append({
-                        "topic": topic,
-                        "status": "generated",
-                        "document_count": len(split_docs)
-                    })
-                else:
-                    results.append({
-                        "topic": topic,
-                        "status": "no_documents_found",
-                        "document_count": 0
-                    })
-                    
-            except Exception as e:
-                results.append({
-                    "topic": topic,
-                    "status": "error",
-                    "error": str(e),
-                    "document_count": 0
-                })
-        
-        return {
-            "message": "Auto-generation completed",
-            "results": results
-        }
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -666,10 +611,5 @@ async def explanation_chat(request: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
-    if os.getenv('BACKEND_ON_RENDER', 'false').lower() == 'true':
-        port = int(os.getenv('PORT', 8000))
-        uvicorn.run(app, host="0.0.0.0", port=port) 
-    else:
-        import os
-        port = int(os.getenv('PORT', 8000))
-        uvicorn.run(app, host="0.0.0.0", port=port) 
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
